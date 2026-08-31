@@ -1,7 +1,3 @@
-
-![Elite Multibox Launcher Demo](demo.gif)
-
-
 # Elite Dangerous Multibox Launcher
 
 A lightweight Windows GUI for launching multiple Elite Dangerous CMDRs and their companion programs from one place.
@@ -85,3 +81,6 @@ The first launch under a new Windows user may ask for that user's Windows passwo
 - Windows
 - Windows PowerShell
 - Separate Windows accounts only if you want to use RunAs
+
+## Demo
+![Elite Multibox Launcher Demo](demo.gif)
