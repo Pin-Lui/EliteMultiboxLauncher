@@ -2,6 +2,33 @@
 
 A lightweight Windows GUI for launching multiple Elite Dangerous CMDRs and their companion programs from one place.
 
+## Files
+
+Keep these files together:
+
+```text
+EliteMultiboxLauncher.vbs <---- Launch the ps1 without a command prompt.
+EliteMultiboxLauncher.ps1 <---- The program can be run directly.
+config.json               <---- The savefile
+```
+
+## First Start
+
+After downloading/extracting the launcher, Windows may block downloaded script files.
+
+Before starting it for the first time:
+
+1. Right-click `EliteMultiboxLauncher.vbs` → **Properties** → check **Unblock** → **Apply**.
+2. Right-click `EliteMultiboxLauncher.ps1` → **Properties** → check **Unblock** → **Apply**.
+
+Then start the launcher with:
+
+```text
+EliteMultiboxLauncher.vbs
+```
+
+The `.vbs` starts the GUI without leaving a PowerShell console open in the background.
+
 ## Features
 
 * Add, edit, and remove commanders and programs.
@@ -47,33 +74,6 @@ Each commander has a **Use RunAs** option.
 - **Disabled:** programs run normally under your current Windows user.
 
 The first launch under a new Windows user may ask for that user's Windows password. The launcher does not store passwords itself.
-
-## Files
-
-Keep these files together:
-
-```text
-EliteMultiboxLauncher.vbs <---- Launch the ps1 without a command prompt.
-EliteMultiboxLauncher.ps1 <---- The program can be run directly.
-config.json               <---- The savefile
-```
-
-## First Start
-
-After downloading/extracting the launcher, Windows may block downloaded script files.
-
-Before starting it for the first time:
-
-1. Right-click `EliteMultiboxLauncher.vbs` → **Properties** → check **Unblock** → **Apply**.
-2. Right-click `EliteMultiboxLauncher.ps1` → **Properties** → check **Unblock** → **Apply**.
-
-Then start the launcher with:
-
-```text
-EliteMultiboxLauncher.vbs
-```
-
-The `.vbs` starts the GUI without leaving a PowerShell console open in the background.
 
 ## Requirements
 
