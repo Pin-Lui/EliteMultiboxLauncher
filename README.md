@@ -2,7 +2,7 @@
 
 A lightweight Windows application that lets you launch multiple Elite Dangerous CMDRs and their companion programs from a single, convenient interface.
 
-**Note: This script does not create Windows user accounts. Please ensure all required accounts already exist. For companion programs such as browsers to work properly, log in at least once to each Windows user account and set a default browser.**
+## **Note: This script does not create Windows user accounts. Please ensure all required accounts already exist. For companion programs such as browsers to work properly, log in at least once to each Windows user account and set a default browser.**
 
 ## Files
 
