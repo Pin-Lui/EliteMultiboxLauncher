@@ -1,5 +1,5 @@
 
-![Elite Multibox Launcher Demo](https://i.imgur.com/VmK6Fdr.gif)
+![Elite Multibox Launcher Demo](https://imgur.com/VmK6Fdr)
 
 
 # Elite Dangerous Multibox Launcher
