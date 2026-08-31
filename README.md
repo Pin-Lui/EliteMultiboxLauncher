@@ -1,5 +1,5 @@
 
-<img src="https://i.imgur.com/VmK6Fdr.gif" alt="Elite Multibox Launcher Demo" width="400">
+![Elite Multibox Launcher Demo](demo.gif)
 
 
 # Elite Dangerous Multibox Launcher
