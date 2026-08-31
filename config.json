@@ -1,0 +1,24 @@
+﻿{
+    "commanders":  [
+                       {
+                           "name":  "CMDR_Alt1",
+                           "windowsUser":  "CMDR_Alt1",
+                           "minEdProfile":  "CMDR_Alt1",
+                           "useRunAs":  true
+                       }
+                   ],
+    "programs":  [
+                     {
+                         "name":  "Elite Dangerous",
+                         "path":  "C:\\Program Files (x86)\\Frontier\\EDLaunch\\MinEdLauncher.exe",
+                         "arguments":  "/frontier {MinEdProfile} /edo /autorun /autoquit"
+                     }
+                 ],
+    "selectedCommanderKeys":  [
+
+                              ],
+    "selectedProgramKeys":  [
+                                "path|C:\\Program Files (x86)\\Frontier\\EDLaunch\\MinEdLauncher.exe"
+                            ],
+    "closeAfterLaunch":  false
+}
