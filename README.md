@@ -1,3 +1,7 @@
+
+![Elite Multibox Launcher Demo](https://i.imgur.com/VmK6Fdr.gif)
+
+
 # Elite Dangerous Multibox Launcher
 
 A lightweight Windows GUI for launching multiple Elite Dangerous CMDRs and their companion programs from one place.
