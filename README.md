@@ -4,7 +4,7 @@ A lightweight Windows GUI for launching multiple Elite Dangerous CMDRs and their
 
 ## Files
 
-Keep these files together:
+Keep these files together in a Folder:
 
 ```text
 EliteMultiboxLauncher.vbs <---- Launch the ps1 without a command prompt.
@@ -20,6 +20,7 @@ Before starting it for the first time:
 
 1. Right-click `EliteMultiboxLauncher.vbs` → **Properties** → check **Unblock** → **Apply**.
 2. Right-click `EliteMultiboxLauncher.ps1` → **Properties** → check **Unblock** → **Apply**.
+3. Optional: Make a shortcut from the `.vbs` file on your Desktop
 
 Then start the launcher with:
 
