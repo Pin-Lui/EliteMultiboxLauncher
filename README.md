@@ -82,7 +82,7 @@ The first launch under a new Windows user may ask for that user's Windows passwo
 
 - Windows
 - Windows PowerShell
-- Separate Windows accounts only if you want to use RunAs
+- min-ED https://github.com/rfvgyhn/min-ed-launcher
 
 ## Demo
 ![Elite Multibox Launcher Demo](demo.gif)
