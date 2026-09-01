@@ -117,7 +117,6 @@ function Start-AsUser($Commander, $Program) {
 
     $expandedArgs = Expand-ProgramArgs ([string]$Program.arguments) $Commander
 
-    # Existing commanders/configs without useRunAs keep the original RUNAS behavior.
     $useRunAs = $true
     if ($null -ne $Commander.PSObject.Properties['useRunAs'] -and $null -ne $Commander.useRunAs) {
         $useRunAs = [bool]$Commander.useRunAs
@@ -133,9 +132,6 @@ function Start-AsUser($Commander, $Program) {
         return
     }
 
-    # Build exactly one command string for RUNAS.
-    # RUNAS expects:
-    #   runas /user:USERNAME /savecred "program.exe arguments"
     $command = '"' + $path + '"'
     if (-not [string]::IsNullOrWhiteSpace($expandedArgs)) {
         $command += " " + $expandedArgs
@@ -337,7 +333,6 @@ function New-ProgramDialog($Existing = $null) {
 }
 
 function Add-CheckboxOnlyClickBehavior($List) {
-    # Remember the state before WinForms processes the click.
     $List.Add_MouseDown({
         param($control, $e)
 
@@ -365,7 +360,6 @@ function Add-CheckboxOnlyClickBehavior($List) {
             return
         }
 
-        # Clicking the text only selects the row.
         $control.SelectedIndex = $index
 
         if ($null -eq $clickState -or
@@ -374,9 +368,6 @@ function Add-CheckboxOnlyClickBehavior($List) {
             return
         }
 
-        # Force exactly one toggle based on the state that existed BEFORE
-        # WinForms handled the mouse click. BeginInvoke runs after the native
-        # CheckedListBox click processing, so Windows cannot toggle it back.
         $targetIndex = [int]$clickState.Index
         $targetChecked = -not [bool]$clickState.WasChecked
         $targetList = $control
