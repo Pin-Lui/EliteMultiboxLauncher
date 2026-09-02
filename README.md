@@ -18,7 +18,7 @@ config.json               <---- The savefile
 - Windows
 - Windows PowerShell
 - min-ED https://github.com/rfvgyhn/min-ed-launcher
-- 
+
 ## First Start
 
 After downloading/extracting the launcher, Windows may block downloaded script files.
