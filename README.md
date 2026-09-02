@@ -24,11 +24,12 @@ Before starting it for the first time:
 2. Right-click `EliteMultiboxLauncher.ps1` → **Properties** → check **Unblock** → **Apply**.
 3. Optional: Make a shortcut from the `.vbs` file on your Desktop
 
-Then start the launcher with:
+Then start the launcher with :
 
 ```text
 EliteMultiboxLauncher.vbs
 ```
+(or your shortcut)
 
 The `.vbs` starts the GUI without leaving a PowerShell console open in the background.
 
