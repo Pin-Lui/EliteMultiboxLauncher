@@ -1,8 +1,38 @@
-﻿Add-Type -AssemblyName System.Windows.Forms
+﻿<#
+MIT License
+
+Copyright (c) 2026 Pin-Lui
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+#>
+
+# Elite Multibox Launcher
+#
+# Launches one or more external programs (game client, companion apps, etc.)
+# once per selected "Commander"
+
+Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $ErrorActionPreference = "Stop"
 
+# Config lives beside the script (not %APPDATA%)
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ConfigPath = Join-Path $ScriptDir "config.json"
 
@@ -50,6 +80,7 @@ function Set-DarkTheme($Control) {
             $child.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
         }
         elseif ($child -is [System.Windows.Forms.Label]) {
+
             if ($child.ForeColor -eq [System.Drawing.Color]::Empty -or
                 $child.ForeColor -eq [System.Drawing.SystemColors]::ControlText) {
                 $child.ForeColor = [System.Drawing.Color]::Gainsboro
@@ -64,6 +95,7 @@ function Set-DarkTheme($Control) {
 }
 
 function Get-Config {
+    # Auto-create an empty config on first run
     if (-not (Test-Path $ConfigPath)) {
         $default = @{
             commanders            = @()
@@ -88,19 +120,17 @@ function Save-Config($Config) {
         $Config | ConvertTo-Json -Depth 10 | Set-Content -Path $ConfigPath -Encoding UTF8
     }
     catch {
-        Show-Error "Could not save config.json.`r`n`r`n$($_.Exception.Message)"
+        Show-Error ("Could not save config.json to:`r`n$ConfigPath`r`n`r`n$($_.Exception.Message)`r`n`r`n" +
+            "This folder may be read-only (e.g. Program Files) or synced/locked by another process. " +
+            "Move EliteMultiboxLauncher.ps1 (and EliteMultiboxLauncher.vbs) to a folder you have write access to, " +
+            "such as your Documents folder, and try again. Your changes were not saved.")
     }
-}
-
-function ConvertTo-QuotedArg([string]$Text) {
-    if ($null -eq $Text) { return '""' }
-    return '"' + ($Text -replace '"','\"') + '"'
 }
 
 function Expand-ProgramArgs([string]$Arguments, $Commander) {
     if ([string]::IsNullOrWhiteSpace($Arguments)) {
         return ""
-    }
+    }d
 
     $result = $Arguments
     $result = $result.Replace("{Commander}", [string]$Commander.name)
@@ -149,6 +179,7 @@ function Start-AsUser($Commander, $Program) {
     }
 }
 
+# One dialog serves both Add and Edit 
 function New-CommanderDialog($Existing = $null) {
     $f = New-Object System.Windows.Forms.Form
     $f.Text = if ($Existing) { "Edit Commander" } else { "Add Commander" }
@@ -221,6 +252,11 @@ function New-CommanderDialog($Existing = $null) {
             return $null
         }
 
+        if ($boxes[1].Text -match '"') {
+            Show-Error "Windows user cannot contain a double-quote (`") character."
+            return $null
+        }
+
         return [pscustomobject]@{
             name          = $boxes[0].Text.Trim()
             windowsUser   = $boxes[1].Text.Trim()
@@ -273,6 +309,7 @@ function New-ProgramDialog($Existing = $null) {
 
     $browse.Add_Click({
         $ofd = New-Object System.Windows.Forms.OpenFileDialog
+        # "All files" is included alongside the executable filter
         $ofd.Filter = "Programs (*.exe;*.cmd;*.bat)|*.exe;*.cmd;*.bat|All files (*.*)|*.*"
         if ($ofd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             $txtPath.Text = $ofd.FileName
@@ -332,6 +369,12 @@ function New-ProgramDialog($Existing = $null) {
     return $null
 }
 
+# CheckedListBox's built-in CheckOnClick toggles the check state on a click
+# anywhere in the row, not just on the checkbox glyph — but Edit/Remove need
+# a plain row click to just select an item, without also flipping its check.
+# CheckOnClick is left off (set where these lists are created) and this
+# reimplements it manually so only clicking the ~18px checkbox area toggles
+# the check, while any click still updates SelectedIndex for Edit/Remove.
 function Add-CheckboxOnlyClickBehavior($List) {
     $List.Add_MouseDown({
         param($control, $e)
@@ -342,6 +385,10 @@ function Add-CheckboxOnlyClickBehavior($List) {
             return
         }
 
+        # Captured on MouseDown, compared again on MouseUp, so a
+        # click-drag-release off the checkbox (or onto a different row)
+        # doesn't register as a toggle — only a clean click on the same
+        # checkbox does.
         $control.Tag = [PSCustomObject]@{
             Index       = $index
             CheckboxHit = ($e.X -ge 0 -and $e.X -le 18)
@@ -360,6 +407,7 @@ function Add-CheckboxOnlyClickBehavior($List) {
             return
         }
 
+        # Always select on click (even off the checkbox)
         $control.SelectedIndex = $index
 
         if ($null -eq $clickState -or
@@ -372,6 +420,11 @@ function Add-CheckboxOnlyClickBehavior($List) {
         $targetChecked = -not [bool]$clickState.WasChecked
         $targetList = $control
 
+        # Deferred via BeginInvoke rather than called inline: this MouseUp
+        # handler runs alongside the CheckedListBox's own built-in mouse
+        # handling for the same click, and setting the check synchronously
+        # here was inconsistent depending on which ran first. Queuing it lets
+        # the control finish its own handling before this applies the toggle.
         $action = {
             if ($targetIndex -ge 0 -and $targetIndex -lt $targetList.Items.Count) {
                 $targetList.SetItemChecked($targetIndex, $targetChecked)
@@ -382,6 +435,11 @@ function Add-CheckboxOnlyClickBehavior($List) {
     })
 }
 
+# Selection is persisted by identity, not by list position, because the
+# list order isn't stable — adding, removing, or editing a commander/program
+# shifts every index after it. Saving "index 2 was checked" would silently
+# re-check the wrong entry after any edit; a value that identifies the
+# specific commander survives reordering.
 function Get-CommanderSelectionKey($Commander) {
     $windowsUser = [string]$Commander.windowsUser
     if (-not [string]::IsNullOrWhiteSpace($windowsUser)) {
@@ -396,7 +454,6 @@ function Get-ProgramSelectionKey($Program) {
     if (-not [string]::IsNullOrWhiteSpace($path)) {
         return "path|$($path.Trim())"
     }
-
     return "name|$([string]$Program.name)"
 }
 
@@ -461,6 +518,8 @@ function Update-Lists {
 # Configuration
 # -----------------------------------------------------------------------------
 
+try {
+
 $config = Get-Config
 
 if ($null -eq $config) {
@@ -522,6 +581,9 @@ $lblProg.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.
 $form.Controls.Add($lblProg)
 
 $cmdList = New-Object System.Windows.Forms.CheckedListBox
+# Off so Add-CheckboxOnlyClickBehavior's manual handling is the only thing
+# driving check state — leaving the built-in behavior on too would fight
+# with it (double-toggle on a single click).
 $cmdList.CheckOnClick = $false
 $cmdList.Location = New-Object System.Drawing.Point(20, 100)
 $cmdList.Size = New-Object System.Drawing.Size(405, 350)
@@ -774,6 +836,9 @@ $start.Add_Click({
 
     $errors = @()
 
+    # Every checked program is launched for every checked commander (a full
+    # cross product), matching the two independent checklists in the UI —
+    # e.g. 3 commanders x 2 programs queues 6 launches, one per pairing.
     foreach ($commander in $selectedCommanders) {
         foreach ($program in $selectedPrograms) {
             try {
@@ -804,3 +869,8 @@ $form.Add_FormClosing({
 
 Set-DarkTheme $form
 [void]$form.ShowDialog()
+
+}
+catch {
+    Show-Error "Unexpected error:`r`n`r`n$($_.Exception.Message)`r`n`r`n$($_.ScriptStackTrace)"
+}
