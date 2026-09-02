@@ -13,7 +13,12 @@ EliteMultiboxLauncher.vbs <---- Launch the ps1 without a command prompt.
 EliteMultiboxLauncher.ps1 <---- The program can be run directly.
 config.json               <---- The savefile
 ```
+## Requirements
 
+- Windows
+- Windows PowerShell
+- min-ED https://github.com/rfvgyhn/min-ed-launcher
+- 
 ## First Start
 
 After downloading/extracting the launcher, Windows may block downloaded script files.
@@ -78,12 +83,6 @@ Each commander has a **Use RunAs** option.
 - **Disabled:** programs run normally under your current Windows user.
 
 The first launch under a new Windows user may ask for that user's Windows password. The launcher does not store passwords itself.
-
-## Requirements
-
-- Windows
-- Windows PowerShell
-- min-ED https://github.com/rfvgyhn/min-ed-launcher
 
 ## Demo
 ![Elite Multibox Launcher Demo](demo.gif)
