@@ -130,7 +130,7 @@ function Save-Config($Config) {
 function Expand-ProgramArgs([string]$Arguments, $Commander) {
     if ([string]::IsNullOrWhiteSpace($Arguments)) {
         return ""
-    }d
+    }
 
     $result = $Arguments
     $result = $result.Replace("{Commander}", [string]$Commander.name)
