@@ -32,7 +32,6 @@ Add-Type -AssemblyName System.Drawing
 
 $ErrorActionPreference = "Stop"
 
-# Config lives beside the script (not %APPDATA%)
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ConfigPath = Join-Path $ScriptDir "config.json"
 
@@ -95,7 +94,6 @@ function Set-DarkTheme($Control) {
 }
 
 function Get-Config {
-    # Auto-create an empty config on first run
     if (-not (Test-Path $ConfigPath)) {
         $default = @{
             commanders            = @()
@@ -132,15 +130,20 @@ function Expand-ProgramArgs([string]$Arguments, $Commander) {
         return ""
     }
 
+    $windowsUser = [string]$Commander.windowsUser
+    if ([string]::IsNullOrWhiteSpace($windowsUser)) {
+        $windowsUser = [string]$env:USERNAME
+    }
+
     $result = $Arguments
     $result = $result.Replace("{Commander}", [string]$Commander.name)
-    $result = $result.Replace("{WindowsUser}", [string]$Commander.windowsUser)
+    $result = $result.Replace("{WindowsUser}", $windowsUser)
     $result = $result.Replace("{MinEdProfile}", [string]$Commander.minEdProfile)
     return $result
 }
 
 function Start-AsUser($Commander, $Program) {
-    $path = [string]$Program.path
+    $path = Expand-ProgramArgs ([string]$Program.path) $Commander
     if (-not (Test-Path $path)) {
         throw "Program not found: $path"
     }
@@ -179,7 +182,6 @@ function Start-AsUser($Commander, $Program) {
     }
 }
 
-# One dialog serves both Add and Edit 
 function New-CommanderDialog($Existing = $null) {
     $f = New-Object System.Windows.Forms.Form
     $f.Text = if ($Existing) { "Edit Commander" } else { "Add Commander" }
@@ -309,7 +311,6 @@ function New-ProgramDialog($Existing = $null) {
 
     $browse.Add_Click({
         $ofd = New-Object System.Windows.Forms.OpenFileDialog
-        # "All files" is included alongside the executable filter
         $ofd.Filter = "Programs (*.exe;*.cmd;*.bat)|*.exe;*.cmd;*.bat|All files (*.*)|*.*"
         if ($ofd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             $txtPath.Text = $ofd.FileName
@@ -369,12 +370,6 @@ function New-ProgramDialog($Existing = $null) {
     return $null
 }
 
-# CheckedListBox's built-in CheckOnClick toggles the check state on a click
-# anywhere in the row, not just on the checkbox glyph — but Edit/Remove need
-# a plain row click to just select an item, without also flipping its check.
-# CheckOnClick is left off (set where these lists are created) and this
-# reimplements it manually so only clicking the ~18px checkbox area toggles
-# the check, while any click still updates SelectedIndex for Edit/Remove.
 function Add-CheckboxOnlyClickBehavior($List) {
     $List.Add_MouseDown({
         param($control, $e)
@@ -385,10 +380,6 @@ function Add-CheckboxOnlyClickBehavior($List) {
             return
         }
 
-        # Captured on MouseDown, compared again on MouseUp, so a
-        # click-drag-release off the checkbox (or onto a different row)
-        # doesn't register as a toggle — only a clean click on the same
-        # checkbox does.
         $control.Tag = [PSCustomObject]@{
             Index       = $index
             CheckboxHit = ($e.X -ge 0 -and $e.X -le 18)
@@ -407,7 +398,6 @@ function Add-CheckboxOnlyClickBehavior($List) {
             return
         }
 
-        # Always select on click (even off the checkbox)
         $control.SelectedIndex = $index
 
         if ($null -eq $clickState -or
@@ -420,24 +410,9 @@ function Add-CheckboxOnlyClickBehavior($List) {
         $targetChecked = -not [bool]$clickState.WasChecked
         $targetList = $control
 
-        # Deferred via BeginInvoke rather than called inline: this MouseUp
-        # handler runs alongside the CheckedListBox's own built-in mouse
-        # handling for the same click, and setting the check synchronously
-        # here was inconsistent depending on which ran first. Queuing it lets
-        # the control finish its own handling before this applies the toggle.
         $action = {
             if ($targetIndex -ge 0 -and $targetIndex -lt $targetList.Items.Count) {
-                # Marks this specific SetItemChecked call as authorized, so
-                # the ItemCheck handler below lets it through instead of
-                # canceling it as an unrecognized (native, non-checkbox)
-                # check attempt. Must be $global:, not $script: — this
-                # block is .GetNewClosure()'d just below (needed so
-                # $targetIndex/$targetChecked/$targetList keep the values
-                # captured at click time rather than whatever they are by
-                # the time BeginInvoke actually runs this), and that binds
-                # the block to its own dynamic module with its own separate
-                # script scope. $script:AllowCheckToggle here would silently
-                # set a variable the ItemCheck handler never sees.
+
                 $global:AllowCheckToggle = $true
                 try {
                     $targetList.SetItemChecked($targetIndex, $targetChecked)
@@ -452,11 +427,6 @@ function Add-CheckboxOnlyClickBehavior($List) {
     })
 }
 
-# Selection is persisted by identity, not by list position, because the
-# list order isn't stable — adding, removing, or editing a commander/program
-# shifts every index after it. Saving "index 2 was checked" would silently
-# re-check the wrong entry after any edit; a value that identifies the
-# specific commander survives reordering.
 function Get-CommanderSelectionKey($Commander) {
     $windowsUser = [string]$Commander.windowsUser
     if (-not [string]::IsNullOrWhiteSpace($windowsUser)) {
@@ -507,6 +477,30 @@ function Update-Lists {
     try {
         $savedCommanderKeys = @($config.selectedCommanderKeys)
         $savedProgramKeys = @($config.selectedProgramKeys)
+
+        $commandersNoRunAs = @()
+        $commandersRunAs = @()
+        foreach ($c in @($config.commanders)) {
+            if ($null -ne $c.PSObject.Properties['useRunAs'] -and -not [bool]$c.useRunAs) {
+                $commandersNoRunAs += $c
+            }
+            else {
+                $commandersRunAs += $c
+            }
+        }
+        $config.commanders = @($commandersNoRunAs) + @($commandersRunAs)
+
+        $eliteDangerousPrograms = @()
+        $otherPrograms = @()
+        foreach ($p in @($config.programs)) {
+            if ([string]$p.name -eq "Elite Dangerous") {
+                $eliteDangerousPrograms += $p
+            }
+            else {
+                $otherPrograms += $p
+            }
+        }
+        $config.programs = @($eliteDangerousPrograms) + @($otherPrograms)
 
         $cmdList.Items.Clear()
         foreach ($c in @($config.commanders)) {
@@ -560,16 +554,6 @@ elseif ($null -eq $config.closeAfterLaunch) {
 }
 
 $script:RestoringChecks = $false
-# Gates every check-state change that isn't a list restore: only set to
-# $true for the duration of a call this script itself intends (checkbox-
-# glyph click, Select All/None) — see the ItemCheck handlers below, which
-# cancel anything else so native single/double-click toggling never applies.
-# Deliberately $global:, not $script: — the checkbox-glyph click sets this
-# from inside a .GetNewClosure()'d scriptblock (see Add-CheckboxOnlyClick
-# Behavior below), and GetNewClosure() binds a scriptblock to its own new
-# dynamic module with an isolated script scope, so a $script: variable set
-# there is invisible outside it. Global scope is the only scope that
-# closure and this script actually share.
 $global:AllowCheckToggle = $false
 
 # -----------------------------------------------------------------------------
@@ -609,9 +593,6 @@ $lblProg.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.
 $form.Controls.Add($lblProg)
 
 $cmdList = New-Object System.Windows.Forms.CheckedListBox
-# Off so Add-CheckboxOnlyClickBehavior's manual handling is the only thing
-# driving check state — leaving the built-in behavior on too would fight
-# with it (double-toggle on a single click).
 $cmdList.CheckOnClick = $false
 $cmdList.Location = New-Object System.Drawing.Point(20, 100)
 $cmdList.Size = New-Object System.Drawing.Size(405, 350)
@@ -724,10 +705,7 @@ $cmdList.Add_ItemCheck({
     param($control, $e)
     if ($script:RestoringChecks) { return }
     if (-not $global:AllowCheckToggle) {
-        # Not one of our own authorized calls — this is CheckedListBox's
-        # native click/double-click/keyboard toggle trying to fire on its
-        # own. Resetting NewValue to CurrentValue cancels it, which is what
-        # makes the checkbox glyph the only thing that can check an item.
+
         $e.NewValue = $e.CurrentValue
         return
     }
@@ -754,8 +732,6 @@ $closeAfterLaunch.Add_CheckedChanged({
 })
 
 $btnCmdAll.Add_Click({
-    # Same authorization flag as the checkbox-glyph click, so this bulk
-    # check-setting isn't itself canceled by the new ItemCheck guard.
     $global:AllowCheckToggle = $true
     try {
         for ($i=0; $i -lt $cmdList.Items.Count; $i++) { $cmdList.SetItemChecked($i, $true) }
@@ -777,12 +753,6 @@ $btnCmdNone.Add_Click({
     $form.BeginInvoke([System.Action]{ Save-SelectionState }) | Out-Null
 })
 
-# Double-clicking a commander row opens a plain command prompt as that
-# commander's Windows user — a quick way to check credentials/permissions
-# for that account without adding cmd.exe as a saved program entry.
-# IndexFromPoint (rather than SelectedIndex) is used so this only fires for
-# the row actually under the cursor, independent of whatever the existing
-# MouseDown/MouseUp checkbox handling left selected.
 $cmdList.Add_MouseDoubleClick({
     param($control, $e)
 
@@ -792,9 +762,6 @@ $cmdList.Add_MouseDoubleClick({
     }
 
     $commander = $config.commanders[$index]
-    # Reuses Start-AsUser with cmd.exe as a synthetic "program" instead of a
-    # separate launch path, so this gets the same runas/quoting/error
-    # handling as every other launch instead of a second copy of that logic.
     $cmdProgram = [pscustomobject]@{
         path      = $env:ComSpec
         arguments = ""
@@ -935,9 +902,6 @@ $start.Add_Click({
 
     $errors = @()
 
-    # Every checked program is launched for every checked commander (a full
-    # cross product), matching the two independent checklists in the UI —
-    # e.g. 3 commanders x 2 programs queues 6 launches, one per pairing.
     foreach ($commander in $selectedCommanders) {
         foreach ($program in $selectedPrograms) {
             try {
