@@ -427,7 +427,24 @@ function Add-CheckboxOnlyClickBehavior($List) {
         # the control finish its own handling before this applies the toggle.
         $action = {
             if ($targetIndex -ge 0 -and $targetIndex -lt $targetList.Items.Count) {
-                $targetList.SetItemChecked($targetIndex, $targetChecked)
+                # Marks this specific SetItemChecked call as authorized, so
+                # the ItemCheck handler below lets it through instead of
+                # canceling it as an unrecognized (native, non-checkbox)
+                # check attempt. Must be $global:, not $script: — this
+                # block is .GetNewClosure()'d just below (needed so
+                # $targetIndex/$targetChecked/$targetList keep the values
+                # captured at click time rather than whatever they are by
+                # the time BeginInvoke actually runs this), and that binds
+                # the block to its own dynamic module with its own separate
+                # script scope. $script:AllowCheckToggle here would silently
+                # set a variable the ItemCheck handler never sees.
+                $global:AllowCheckToggle = $true
+                try {
+                    $targetList.SetItemChecked($targetIndex, $targetChecked)
+                }
+                finally {
+                    $global:AllowCheckToggle = $false
+                }
             }
         }.GetNewClosure()
 
@@ -543,6 +560,17 @@ elseif ($null -eq $config.closeAfterLaunch) {
 }
 
 $script:RestoringChecks = $false
+# Gates every check-state change that isn't a list restore: only set to
+# $true for the duration of a call this script itself intends (checkbox-
+# glyph click, Select All/None) — see the ItemCheck handlers below, which
+# cancel anything else so native single/double-click toggling never applies.
+# Deliberately $global:, not $script: — the checkbox-glyph click sets this
+# from inside a .GetNewClosure()'d scriptblock (see Add-CheckboxOnlyClick
+# Behavior below), and GetNewClosure() binds a scriptblock to its own new
+# dynamic module with an isolated script scope, so a $script: variable set
+# there is invisible outside it. Global scope is the only scope that
+# closure and this script actually share.
+$global:AllowCheckToggle = $false
 
 # -----------------------------------------------------------------------------
 # Main form and controls
@@ -693,12 +721,26 @@ $form.Controls.Add($closeAfterLaunch)
 Update-Lists
 
 $cmdList.Add_ItemCheck({
+    param($control, $e)
     if ($script:RestoringChecks) { return }
+    if (-not $global:AllowCheckToggle) {
+        # Not one of our own authorized calls — this is CheckedListBox's
+        # native click/double-click/keyboard toggle trying to fire on its
+        # own. Resetting NewValue to CurrentValue cancels it, which is what
+        # makes the checkbox glyph the only thing that can check an item.
+        $e.NewValue = $e.CurrentValue
+        return
+    }
     $form.BeginInvoke([System.Action]{ Save-SelectionState }) | Out-Null
 })
 
 $progList.Add_ItemCheck({
+    param($control, $e)
     if ($script:RestoringChecks) { return }
+    if (-not $global:AllowCheckToggle) {
+        $e.NewValue = $e.CurrentValue
+        return
+    }
     $form.BeginInvoke([System.Action]{ Save-SelectionState }) | Out-Null
 })
 
@@ -712,22 +754,79 @@ $closeAfterLaunch.Add_CheckedChanged({
 })
 
 $btnCmdAll.Add_Click({
-    for ($i=0; $i -lt $cmdList.Items.Count; $i++) { $cmdList.SetItemChecked($i, $true) }
+    # Same authorization flag as the checkbox-glyph click, so this bulk
+    # check-setting isn't itself canceled by the new ItemCheck guard.
+    $global:AllowCheckToggle = $true
+    try {
+        for ($i=0; $i -lt $cmdList.Items.Count; $i++) { $cmdList.SetItemChecked($i, $true) }
+    }
+    finally {
+        $global:AllowCheckToggle = $false
+    }
     $form.BeginInvoke([System.Action]{ Save-SelectionState }) | Out-Null
 })
 
 $btnCmdNone.Add_Click({
-    for ($i=0; $i -lt $cmdList.Items.Count; $i++) { $cmdList.SetItemChecked($i, $false) }
+    $global:AllowCheckToggle = $true
+    try {
+        for ($i=0; $i -lt $cmdList.Items.Count; $i++) { $cmdList.SetItemChecked($i, $false) }
+    }
+    finally {
+        $global:AllowCheckToggle = $false
+    }
     $form.BeginInvoke([System.Action]{ Save-SelectionState }) | Out-Null
 })
 
+# Double-clicking a commander row opens a plain command prompt as that
+# commander's Windows user — a quick way to check credentials/permissions
+# for that account without adding cmd.exe as a saved program entry.
+# IndexFromPoint (rather than SelectedIndex) is used so this only fires for
+# the row actually under the cursor, independent of whatever the existing
+# MouseDown/MouseUp checkbox handling left selected.
+$cmdList.Add_MouseDoubleClick({
+    param($control, $e)
+
+    $index = $control.IndexFromPoint($e.Location)
+    if ($index -lt 0 -or $index -ge @($config.commanders).Count) {
+        return
+    }
+
+    $commander = $config.commanders[$index]
+    # Reuses Start-AsUser with cmd.exe as a synthetic "program" instead of a
+    # separate launch path, so this gets the same runas/quoting/error
+    # handling as every other launch instead of a second copy of that logic.
+    $cmdProgram = [pscustomobject]@{
+        path      = $env:ComSpec
+        arguments = ""
+    }
+
+    try {
+        Start-AsUser $commander $cmdProgram
+    }
+    catch {
+        Show-Error "Could not open a command prompt for $($commander.name): $($_.Exception.Message)"
+    }
+})
+
 $btnProgAll.Add_Click({
-    for ($i=0; $i -lt $progList.Items.Count; $i++) { $progList.SetItemChecked($i, $true) }
+    $global:AllowCheckToggle = $true
+    try {
+        for ($i=0; $i -lt $progList.Items.Count; $i++) { $progList.SetItemChecked($i, $true) }
+    }
+    finally {
+        $global:AllowCheckToggle = $false
+    }
     $form.BeginInvoke([System.Action]{ Save-SelectionState }) | Out-Null
 })
 
 $btnProgNone.Add_Click({
-    for ($i=0; $i -lt $progList.Items.Count; $i++) { $progList.SetItemChecked($i, $false) }
+    $global:AllowCheckToggle = $true
+    try {
+        for ($i=0; $i -lt $progList.Items.Count; $i++) { $progList.SetItemChecked($i, $false) }
+    }
+    finally {
+        $global:AllowCheckToggle = $false
+    }
     $form.BeginInvoke([System.Action]{ Save-SelectionState }) | Out-Null
 })
 
